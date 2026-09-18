@@ -1,0 +1,53 @@
+name: Atualizar dados do painel
+
+# Roda de hora em hora nos dias úteis, das 7h às 20h (horário de Brasília).
+# O cron do GitHub usa UTC; Brasília = UTC-3.
+on:
+  schedule:
+    - cron: "0 10-23 * * 1-5"
+  workflow_dispatch:        # permite rodar na hora, pelo botão "Run workflow"
+
+permissions:
+  contents: write           # necessário para gravar o dados.json de volta no repositório
+
+concurrency:
+  group: atualizar-dados
+  cancel-in-progress: true
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependências
+        run: pip install -r scripts/requirements.txt
+
+      - name: Baixar planilhas do Microsoft 365
+        env:
+          LINK_PRODUTIVIDADE: ${{ secrets.LINK_PRODUTIVIDADE }}
+          LINK_CUSTOS: ${{ secrets.LINK_CUSTOS }}
+          TENANT_ID: ${{ secrets.TENANT_ID }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+        run: python scripts/baixar.py
+
+      - name: Gerar dados.json
+        run: python scripts/gerar_dados.py
+
+      - name: Publicar se houve mudança
+        run: |
+          git config user.name  "atualizacao-automatica"
+          git config user.email "actions@github.com"
+          git add dados/dados.json
+          if git diff --staged --quiet; then
+            echo "Nada mudou na planilha; nada a publicar."
+          else
+            git commit -m "Atualiza dados do painel — $(date -u '+%d/%m/%Y %H:%M UTC')"
+            git push
+          fi
