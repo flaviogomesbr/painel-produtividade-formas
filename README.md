@@ -136,8 +136,16 @@ O `gerar_dados.py` lê:
   `Prod_Arte-Penha`, `Prod_Origem-Itaquera`, `Prod_Altus_CONCLUÍDO`. Obra nova é
   só criar mais uma aba com esse prefixo; ela aparece no painel sozinha, com cor
   atribuída automaticamente;
-- a aba **`GERAL`**, de onde saem o quadro consolidado por obra (linhas 7 a 12) e
-  a data de atualização (célula D3).
+- a aba **`GERAL`**, de onde saem o quadro consolidado por obra e (se
+  `DATA_ATUALIZACAO_FIXA` estiver vazia) a data de atualização (célula D3).
+  Quando a obra tem **uma linha por torre** (ex.: Origem Itaquera, torres 05, 06 e
+  07), elas viram **uma linha por obra pela média simples das torres** — cada torre
+  pesa igual —, e as colunas de máxima ficam com o maior valor entre as torres.
+  O painel calcula do mesmo jeito: o P15 da média tratada é feito **dentro de cada
+  torre** e a obra é a média simples das torres (Origem Itaquera: 21,63 na média
+  tratada). Cada aba `Prod_` é uma torre;
+- abas com **`OBSOLET`** no nome (ex.: `Prod_Origem-Itaquera_T7_OBSOLET`) são
+  **ignoradas**, para não contar a mesma obra duas vezes.
 
 As colunas são procuradas **pelo nome do cabeçalho**, não pela posição. Por isso
 as abas podem ter colunas diferentes entre si — `EMPREITEIRO` em umas e não em
@@ -160,3 +168,23 @@ Depois de cada alteração de estrutura, rode o workflow pelo botão **Run workf
 e confira o log antes de confiar no painel.
 
 Para fixar a cor de uma obra, edite o mapa `HEX` no `index.html`.
+
+## Data de atualização do painel
+
+Cabeçalho e rodapé mostram a constante `DATA_ATUALIZACAO_FIXA` do
+`scripts/gerar_dados.py` (hoje `2026-10-19`). Para voltar a usar a data da planilha
+(aba GERAL, `DATA ATUALIZAÇÃO`), deixe a constante como `None`.
+
+Os filtros de período **Semanal, Mensal e Anual** abrem sempre no período mais
+recente com produção apontada (sem passar da data de atualização).
+
+## Gráfico 4 — Evolução (eixo "calendário")
+
+O eixo acompanha o filtro de período: **Semanal** mostra semana a semana todas as
+semanas do mês escolhido; **Mensal**, mês a mês todos os meses do ano escolhido;
+**Anual**, ano a ano todos os anos com dados; **Personalizado** escolhe pela duração
+(até 62 dias semana a semana, até cerca de 2 anos mês a mês, acima disso ano a ano);
+**Todo Período** segue semana a semana. Em cada período a obra tem **um ponto só**:
+cada torre entra com a sua média (simples, ou tratada pelo P15 da própria torre) e,
+havendo mais de uma torre no mesmo período, vale o maior ponto.
+

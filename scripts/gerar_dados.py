@@ -14,6 +14,7 @@ import json
 import unicodedata
 import math
 import pathlib
+import re
 import sys
 
 import pandas as pd
@@ -28,6 +29,10 @@ ABA_RESUMO = "GERAL"          # quadro consolidado por obra
 ABA_FICHA = "Ficha-Técnica-Obras"   # caracteristicas de cada obra
 ABA_ANTIGA = "Produt_Montagem-Formas_R02"   # formato anterior, aba unica
 BUSCA_CABECALHO = 30          # ate que linha procurar o cabecalho
+
+# Data de atualizacao mostrada no cabecalho e no rodape do painel. Quando preenchida
+# ("AAAA-MM-DD"), vale esta; com None, vale a da planilha (aba GERAL, DATA ATUALIZACAO).
+DATA_ATUALIZACAO_FIXA = "2026-10-19"
 
 # Como reconhecer cada coluna do quadro GERAL. Cada entrada lista os termos que
 # precisam aparecer no titulo e os que nao podem aparecer. Assim a planilha pode
@@ -91,9 +96,16 @@ def numera_repetidas(cab):
     return saida
 
 
+def aba_obsoleta(nome):
+    """Abas marcadas como OBSOLET(A/O) na planilha ficam de fora: guardam a
+    versao antiga do mesmo dado e contariam a obra duas vezes."""
+    return "OBSOLET" in limpa(nome)
+
+
 def abas_de_obra(wb):
     """Abas Prod_<obra>. Se nao houver nenhuma, cai no formato antigo de aba unica."""
-    abas = [s for s in wb.sheetnames if s.startswith(PREFIXO_ABA)]
+    abas = [s for s in wb.sheetnames
+            if s.startswith(PREFIXO_ABA) and not aba_obsoleta(s)]
     if abas:
         return abas
     if ABA_ANTIGA in wb.sheetnames:
@@ -159,8 +171,11 @@ def le_aba(ws, nome_aba):
         # apontamento na planilha, não produtividade zero de verdade.
         # Sem "sem" a produtividade fica sem numero, em vez de um 0 enganoso.
         _sem_efetivo = _area > 0 and _mont == 0
+        # torre da semana: a aba Prod_ e de uma torre so; o detalhe diario diz qual
+        _torre = detalhe[0]["torre"] if detalhe else str(r.get("TORRE") or "").strip()
         semanas.append({
             "obra": r["OBRA"],
+            "torre": "" if _torre in ("-", "None", "nan") else _torre,
             "ano": int(num(r["ANO"]) or 0),
             "sem": int(num(r["SEMANA DO ANO"]) or 0),
             "periodo": r["PERÍODO"],
@@ -187,9 +202,59 @@ def le_aba(ws, nome_aba):
     return semanas
 
 
+def numero_torre(txt):
+    """'Torre 07' -> 7 ; 'Torre 01 (unica)' -> 1 ; sem numero -> None."""
+    m = re.search(r"\d+", str(txt or ""))
+    return int(m.group()) if m else None
+
+
+def junta_textos(valores):
+    """Une textos de empreiteiros sem repetir nenhum trecho, mantendo a ordem
+    em que aparecem (a ordem de entrada na obra: 'A > B' = A saiu, B entrou)."""
+    saida = []
+    for v in valores:
+        for parte in re.split(r"\s*>\s*", str(v or "")):
+            parte = parte.strip()
+            if parte and parte not in saida:
+                saida.append(parte)
+    return " > ".join(saida)
+
+
+def unifica_obra(obra, linhas):
+    """Uma obra com varias linhas no GERAL (uma por torre) vira uma linha so:
+    MEDIA SIMPLES das torres em cada coluna de media (cada torre pesa igual,
+    como no consolidado da planilha). Colunas de maximo: o maior entre as torres."""
+    if len(linhas) == 1:
+        item = dict(linhas[0])
+        item["torres"] = [{"torre": item.pop("torre", ""), "status": item.pop("status", ""),
+                           "empreiteiros": item.pop("empreiteiros", "")}]
+        item["status"] = item["torres"][0]["status"]
+        item["empreiteiros"] = item["torres"][0]["empreiteiros"]
+        return item
+
+    item = {"obra": obra}
+    for chave in REGRAS_RESUMO:
+        vals = [l.get(chave) for l in linhas if l.get(chave) is not None]
+        if not vals:
+            item[chave] = None
+        elif chave.endswith("max"):
+            item[chave] = max(vals)
+        else:
+            item[chave] = round(sum(vals) / len(vals), 4)
+    status = [str(l.get("status") or "").strip() for l in linhas]
+    # a obra so esta concluida quando todas as torres estao
+    item["status"] = ("Concluído" if all(limpa(x).startswith("CONCLU") for x in status if x)
+                      and any(status) else "Em andamento")
+    item["empreiteiros"] = junta_textos(l.get("empreiteiros") for l in linhas)
+    item["torres"] = [{"torre": str(l.get("torre") or ""), "status": str(l.get("status") or ""),
+                       "empreiteiros": str(l.get("empreiteiros") or "")} for l in linhas]
+    return item
+
+
 def le_resumo(wb):
     """Quadro consolidado por obra, na aba GERAL. As colunas sao reconhecidas
-    pelo titulo, entao mudar a ordem ou inserir colunas nao quebra a leitura."""
+    pelo titulo, entao mudar a ordem ou inserir colunas nao quebra a leitura.
+    Se a planilha traz uma linha por torre, elas sao unificadas por obra."""
     if ABA_RESUMO not in wb.sheetnames:
         return []
     ws = wb[ABA_RESUMO]
@@ -201,6 +266,9 @@ def le_resumo(wb):
     linhas = list(ws.iter_rows(min_row=inicio, values_only=True))
     cab = [limpa(c) for c in linhas[0]]
     col_obra = cab.index("OBRA")
+    col_torre = next((i for i, t in enumerate(cab) if t == "TORRE"), None)
+    col_status = next((i for i, t in enumerate(cab) if t.startswith("STATUS")), None)
+    col_emp = next((i for i, t in enumerate(cab) if "EMPREITEIRO" in t), None)
 
     mapa = {}
     for chave, (precisa, proibe) in REGRAS_RESUMO.items():
@@ -213,16 +281,27 @@ def le_resumo(wb):
         else:
             print(f"- aba {ABA_RESUMO}: coluna '{chave}' nao encontrada.")
 
-    fora = []
+    def cel(r, i):
+        return r[i] if i is not None and i < len(r) else None
+
+    por_obra = {}
     for r in linhas[1:]:
         obra = r[col_obra] if col_obra < len(r) else None
         if not obra or not isinstance(obra, str):
             continue
-        item = {"obra": obra.strip()}
+        item = {"obra": obra.strip(),
+                "torre": cel(r, col_torre), "status": cel(r, col_status),
+                "empreiteiros": cel(r, col_emp)}
         for chave, i in mapa.items():
             item[chave] = num(r[i]) if i < len(r) else None
-        fora.append(item)
-    return fora
+        por_obra.setdefault(item["obra"], []).append(item)
+
+    saida = []
+    for obra, ls in por_obra.items():
+        if len(ls) > 1:
+            print(f"GERAL: {obra} tem {len(ls)} linhas (torres) -> unificada em uma.")
+        saida.append(unifica_obra(obra, ls))
+    return saida
 
 
 def acha_atualizacao(wb):
@@ -276,14 +355,26 @@ def le_ficha(wb):
     return {"campos": campos, "obras": obras}
 
 
+def pavto_valido(pav):
+    """So conta pavimento terreo, tipo (numerado), platibanda ou atico —
+    os unicos estagios que compoem o ciclo estrutural da torre."""
+    t = limpa(pav)
+    if not t:
+        return False
+    if t in ("TERREO", "PLATIBANDA", "ATICO"):
+        return True
+    return bool(re.match(r"^\d+[°º]?\s*PAVTO\.?$", t))
+
+
 def le_ciclo(wb):
     """Ciclo de concretagem: dias corridos entre uma concretagem e a anterior
-    da mesma torre, como a propria planilha calcula na coluna RITMO das abas
-    C.Geo_*. Cada linha valida vira um evento {obra, data, ritmo, torre,
-    pavto, trecho}. A primeira concretagem de cada torre nao tem ritmo (nao
-    ha uma anterior para comparar) e fica de fora, como na planilha."""
-    eventos = []
-    for aba in [s for s in wb.sheetnames if s.startswith("C.Geo")]:
+    da MESMA torre. Calculado aqui, e não lido da coluna RITMO da planilha,
+    porque essa coluna compara com a linha anterior da aba — que pode ser de
+    outra torre, quando duas torres têm concretagens perto uma da outra no
+    calendário e suas linhas ficam intercaladas. A primeira concretagem de
+    cada torre não tem uma anterior para comparar e fica de fora."""
+    brutos = []
+    for aba in [s for s in wb.sheetnames if s.startswith("C.Geo") and not aba_obsoleta(s)]:
         ws = wb[aba]
         obra = ws.cell(2, 1).value
         if not obra or not isinstance(obra, str):
@@ -299,9 +390,9 @@ def le_ciclo(wb):
         col = {}
         for c in range(1, ws.max_column + 1):
             titulo = str(ws.cell(linha_cab, c).value or "").strip()
-            if titulo in ("Data", "Ritmo", "Trecho", "Torre", "Pavto."):
+            if titulo in ("Data", "Trecho", "Torre", "Pavto."):
                 col[titulo] = c
-        faltando = {"Data", "Ritmo", "Torre"} - col.keys()
+        faltando = {"Data", "Torre"} - col.keys()
         if faltando:
             print(f"- {aba}: colunas {faltando} não encontradas, ignorada.")
             continue
@@ -312,22 +403,41 @@ def le_ciclo(wb):
         n = 0
         for linha in ws.iter_rows(min_row=linha_cab + 1, max_col=maxc, values_only=True):
             torre = linha[col["Torre"] - 1]
-            ritmo = linha[col["Ritmo"] - 1]
             data_c = linha[col["Data"] - 1]
-            if not torre or not isinstance(ritmo, (int, float)) or not isinstance(data_c, dt.datetime):
+            if not torre or not isinstance(data_c, dt.datetime):
                 continue
             pav = linha[col["Pavto."] - 1] if "Pavto." in col else None
+            if not pavto_valido(pav):
+                continue
             tre = linha[col["Trecho"] - 1] if "Trecho" in col else None
-            eventos.append({
+            brutos.append({
                 "obra": obra,
-                "data": data_c.strftime("%Y-%m-%d"),
-                "ritmo": num(ritmo),
+                "data": data_c.date(),
                 "torre": str(torre).strip(),
                 "pavto": str(pav or "").strip(),
                 "trecho": str(tre or "").strip(),
             })
             n += 1
-        print(f"{aba:<28} {n} eventos de ciclo ({obra})")
+        print(f"{aba:<28} {n} linhas lidas ({obra})")
+
+    brutos.sort(key=lambda e: (e["obra"], e["torre"], e["data"]))
+    eventos = []
+    anterior = {}
+    for e in brutos:
+        chave = (e["obra"], e["torre"])
+        prev = anterior.get(chave)
+        anterior[chave] = e["data"]
+        if prev is None:
+            continue
+        eventos.append({
+            "obra": e["obra"],
+            "data": e["data"].strftime("%Y-%m-%d"),
+            "ritmo": (e["data"] - prev).days,
+            "torre": e["torre"],
+            "pavto": e["pavto"],
+            "trecho": e["trecho"],
+        })
+    eventos.sort(key=lambda e: (e["obra"], e["data"]))
     return eventos
 
 
@@ -387,13 +497,14 @@ def main():
 
     wb = load_workbook(prod, read_only=True, data_only=True)
 
-    atualizacao = acha_atualizacao(wb)
+    atualizacao = DATA_ATUALIZACAO_FIXA or acha_atualizacao(wb)
 
     cargos, equip = le_bd_custos(wb)
+    semanas = le_semanal(wb)
     saida = {
         "geradoEm": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "atualizacaoPlanilha": atualizacao,
-        "semanas": le_semanal(wb),
+        "semanas": semanas,
         "resumo": le_resumo(wb),
         "trechos": le_bd_obras(wb),
         "cargos": cargos,
