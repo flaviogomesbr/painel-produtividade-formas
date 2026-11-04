@@ -176,6 +176,10 @@ hoje 04/11/2026, versão R08). A constante `DATA_ATUALIZACAO_FIXA` do
 `scripts/gerar_dados.py` está como `None`; para forçar outra data, preencha com
 `"AAAA-MM-DD"`.
 
+Ao abrir, o painel já vem no filtro **Semanal**, na última semana com valores
+válidos (hoje 26/10 a 01/11/2026); "Todo Período" fica a um clique no filtro. O
+mesmo período vale para as abas Ciclo e Ficha.
+
 Os filtros de período **Semanal, Mensal e Anual** abrem sempre no período mais
 recente com produtividade calculada, isto é, com área concretada **e** montadores
 lançados (sem passar da data de atualização). Uma semana em andamento, ainda sem

@@ -2368,6 +2368,10 @@ function montaPeriodo(){
   est.dIni = LIMITE.de; est.dFim = LIMITE.ate;
   RECENTE = dataRecente();
   vista = {ano:+LIMITE.ate.slice(0,4), mes:+LIMITE.ate.slice(5,7)-1};
+  // ao abrir, o painel mostra a última semana com produtividade calculada
+  // (e não todo o período); "Todo Período" continua a um clique no filtro
+  modo = 'semanal';
+  [est.dIni, est.dFim] = faixaDe('semanal', RECENTE || LIMITE.ate);
 }
 function montaSeletorMes(){
   selPeriodo.innerHTML =
