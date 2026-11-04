@@ -32,7 +32,7 @@ BUSCA_CABECALHO = 30          # ate que linha procurar o cabecalho
 
 # Data de atualizacao mostrada no cabecalho e no rodape do painel. Quando preenchida
 # ("AAAA-MM-DD"), vale esta; com None, vale a da planilha (aba GERAL, DATA ATUALIZACAO).
-DATA_ATUALIZACAO_FIXA = "2026-10-19"
+DATA_ATUALIZACAO_FIXA = None
 
 # Como reconhecer cada coluna do quadro GERAL. Cada entrada lista os termos que
 # precisam aparecer no titulo e os que nao podem aparecer. Assim a planilha pode

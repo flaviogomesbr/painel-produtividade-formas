@@ -171,12 +171,15 @@ Para fixar a cor de uma obra, edite o mapa `HEX` no `index.html`.
 
 ## Data de atualização do painel
 
-Cabeçalho e rodapé mostram a constante `DATA_ATUALIZACAO_FIXA` do
-`scripts/gerar_dados.py` (hoje `2026-10-19`). Para voltar a usar a data da planilha
-(aba GERAL, `DATA ATUALIZAÇÃO`), deixe a constante como `None`.
+Cabeçalho e rodapé mostram a data da planilha (aba GERAL, `DATA ATUALIZAÇÃO`;
+hoje 04/11/2026, versão R08). A constante `DATA_ATUALIZACAO_FIXA` do
+`scripts/gerar_dados.py` está como `None`; para forçar outra data, preencha com
+`"AAAA-MM-DD"`.
 
 Os filtros de período **Semanal, Mensal e Anual** abrem sempre no período mais
-recente com produção apontada (sem passar da data de atualização).
+recente com produtividade calculada, isto é, com área concretada **e** montadores
+lançados (sem passar da data de atualização). Uma semana em andamento, ainda sem
+montadores, não vira o período inicial.
 
 ## Gráfico 4 — Evolução (eixo "calendário")
 
