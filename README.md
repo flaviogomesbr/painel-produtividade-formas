@@ -142,12 +142,15 @@ O `gerar_dados.py` lê:
   07), elas viram **uma linha por obra pela média simples das torres** — cada torre
   pesa igual —, e as colunas de máxima ficam com o maior valor entre as torres.
   O painel calcula do mesmo jeito: o P15 da média tratada é feito **dentro de cada
-  torre** e a obra é a média simples das torres (Origem Itaquera: 21,63 na média
-  tratada). Cada aba `Prod_` é uma torre;
+  torre** e a obra é a média simples das torres (Origem Itaquera: 22,55 na média
+  tratada em 04/11/2026). Cada aba `Prod_` é uma torre;
 - abas com **`OBSOLET`** no nome (ex.: `Prod_Origem-Itaquera_T7_OBSOLET`) são
   **ignoradas**, para não contar a mesma obra duas vezes.
 
-As colunas são procuradas **pelo nome do cabeçalho**, não pela posição. Por isso
+As colunas são procuradas **pelo nome do cabeçalho**, não pela posição. Feriados e
+espessura média aceitam variações de nome entre abas (`QTDE. FERIADOS NA SEMANA`,
+`... EM DIA ÚTIL ...`, `... / DIAS SEM EQUIPE ...`; espessura em `m2/m3` ou `m3/m2`):
+basta o cabeçalho conter `FERIAD` / `ESPESSURA MÉDIA PRODUZIDA`. Por isso
 as abas podem ter colunas diferentes entre si — `EMPREITEIRO` em umas e não em
 outras, `TORRE` uma vez ou seis vezes — sem quebrar nada. Inserir ou mover coluna
 também é seguro.
@@ -195,3 +198,38 @@ semanas do mês escolhido; **Mensal**, mês a mês todos os meses do ano escolhi
 cada torre entra com a sua média (simples, ou tratada pelo P15 da própria torre) e,
 havendo mais de uma torre no mesmo período, vale o maior ponto.
 
+
+## Mapa de calor (gráfico 6)
+
+Cada célula é a **média simples das torres da obra naquela semana** (mesma regra do
+consolidado da aba GERAL e do gráfico 1). Na média tratada, a torre abaixo do corte
+P15 sai da média da semana; se todas as torres da semana saíram, o número aparece
+riscado. A coluna **Média** traz a média da obra no período (a mesma do gráfico 1 e
+da aba GERAL) e a linha **Média das obras** traz a média entre as obras selecionadas
+(a mesma do cartão PRODUT. GERAL); com uma só obra selecionada, a linha some. Passando
+o mouse numa célula, o balão lista o valor de cada torre.
+
+## Contagem de semanas e Custos
+
+Onde o painel diz "N semanas" (legenda do gráfico 1, balões, rodapé, tabela de Custo),
+a conta é de **semanas distintas** — duas torres trabalhando na mesma semana contam uma
+só. A média continua feita por torre. No gráfico semanal de Custos há **um ponto por
+obra e semana** (custo somado das torres ÷ área somada); o balão informa quando a
+semana teve mais de uma torre. Na Base semanal, a coluna Obra traz a torre ao lado.
+
+## Efetivo (gráfico 4) e Ciclo de concretagem
+
+**Efetivo.** É a média de montadores das **mesmas semanas que entram na produtividade**
+(semanas com produção e equipe lançada), calculada por torre; a obra é a média simples
+das torres. Na média tratada, entram só as semanas que passaram do corte P15 da própria
+torre, para o ponto do gráfico falar das mesmas semanas nos dois eixos. Por isso não
+coincide com a coluna EFETIVO da aba GERAL, que também conta semanas sem produção
+(equipe já lançada antes da obra começar) e, no "ajustado", corta pelo próprio efetivo.
+
+**Ciclo.** O ciclo médio é calculado **por torre**; a obra é a média simples das torres e
+o cartão CICLO MÉDIO é a média simples das obras selecionadas (Origem Itaquera:
+2,9 dias, contra 3,1 se todas as concretagens fossem juntadas). Mínimo, máximo e a
+contagem de concretagens continuam sobre todos os eventos.
+
+**Ficha Técnica.** Obedece ao filtro de período e de obra: só aparecem as obras cujo
+período de execução cruza o período escolhido.
